@@ -1,5 +1,6 @@
 package com.example.rxjava
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
@@ -18,14 +19,15 @@ import io.reactivex.rxjava3.disposables.Disposable
 import io.reactivex.rxjava3.kotlin.ofType
 import io.reactivex.rxjava3.observers.DisposableObserver
 import io.reactivex.rxjava3.schedulers.Schedulers
-
+import io.reactivex.rxjava3.kotlin.withLatestFrom
+import io.reactivex.rxjava3.subjects.PublishSubject
 
 class MainActivity : AppCompatActivity() {
 
     private val greeting = "Hello From RxJava."
     private lateinit var myObservable: Observable<String>
     private var textView: TextView? = null
-    private var testBtn:Button?=null
+    private var testBtn: Button? = null
     private val TAG = MainActivity::class.simpleName
 
     private val testPublishRelay = PublishRelay.create<Unit>()
@@ -40,11 +42,40 @@ class MainActivity : AppCompatActivity() {
         testBtn?.setOnClickListener {
             testPublishRelay.accept(Unit)
         }
-        Test01()
-        Test02()
-        Test03()
-        Test04()
-        Test05()
+        // Test01()
+        // Test02()
+        // Test03()
+        // Test04()
+        // Test05()
+        Test06() // withLatestFrom
+    }
+
+    /**
+     * withLatestFrom
+     *
+     *  두 Observable 중 첫번째 Observable에서 아이템이 방출될 때마다 그 아이템을 두번째 Observable의 가장 최근 아이템과 결합해 방출.
+     *
+     * @author 권혁신
+     * @version 1.0.0
+     * @since 2021-02-02 오전 9:10
+     **/
+    @SuppressLint("CheckResult")
+    private fun Test06() {
+
+        val publishSubject = PublishSubject.create<Int>()
+        val charSubject = PublishSubject.create<String>()
+
+        publishSubject
+            .withLatestFrom(charSubject)
+            .filter {
+                it.first %2 != 0
+            }.map {
+                it.second + " 홀수임!!"
+            }.exhaustMap {
+                Log.d("dd","dd")
+                Observable.just(it)
+            }
+
     }
 
 
@@ -155,6 +186,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        var count = 0
         val mergedIntents = Observable.mergeArray(
             Observable.just(HomeViewIntent.Initial),
             Observable.just(HomeViewIntent.Refresh),
@@ -162,9 +194,26 @@ class MainActivity : AppCompatActivity() {
             Observable.just(HomeViewIntent.RetryNewest),
             Observable.just(HomeViewIntent.RetryMostViewed),
             Observable.just(HomeViewIntent.RetryUpdate)
-        ) // 6개의 Observable이 있고 이것들이 모두 방출되어야 함.
+        )
+        mergedIntents.publish {
+            Observable.mergeArray(
+                it.ofType<HomeViewIntent.Initial>(),
+                it.ofType<HomeViewIntent.Refresh>(),
+                it.ofType<HomeViewIntent.LoadNextPageUpdatedComic>(),
+                it.ofType<HomeViewIntent.RetryNewest>()
+            )
+        }.subscribe {
+            Log.d("TESTEST", "$it count: ${count++}")
+        }
 
-        mergedIntents.subscribe(intentS::accept)
+
+/*        intentS.compose {
+            it.publish { shared ->
+                shared.ofType<HomeViewIntent.Initial>().take(1)
+                shared.notOfType<HomeViewIntent.Initial,HomeViewIntent>()
+            }
+        }.doOnNext { Log.d("TEST04", "Compose: $it") }
+            .subscribeBy {Log.d("TEST04","onNext: ${it.toString()}") }*/
 
         val mixedSource = Observable.just<HomeViewIntent>(
             HomeViewIntent.Initial,
@@ -172,6 +221,7 @@ class MainActivity : AppCompatActivity() {
         )
             .doOnSubscribe { s: Disposable? -> Log.d("MIXED_SOURCE", "***Subscribed") }
 
+        var testInteger = 0
         mixedSource.publish { f: Observable<HomeViewIntent> ->
             Observable.mergeArray(
                 f.ofType(HomeViewIntent.LoadNextPageUpdatedComic::class.java)
@@ -196,7 +246,7 @@ class MainActivity : AppCompatActivity() {
                     }
             )
         }.subscribe {
-            Log.d("MIXED_SOURCE", it.toString())
+            Log.d("MIXED_SOURCE", "$it")
         }
     }
 
